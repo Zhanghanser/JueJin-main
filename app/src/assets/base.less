@@ -1,0 +1,121 @@
+:root {
+  --bx-background-color: #f2f3f5;
+  --background-color: #fff;
+  --font-color: #0b1016;
+  --search-item-background-color: #fff;
+  --search-item-background-color-hover: #f7f8fa;
+  --border-color: #e4e6eb;
+  --article-item-background-color-hover: #fafafa;
+  --settings-btn-hover: #eaf2ff;
+  --input-background-color: #f2f3f5;
+
+  --theme-color: #1e80ff;
+  --box-radius: 4px;
+  background-color: var(--bx-background-color);
+}
+.dark {
+  --bx-background-color: #000000;
+  --background-color: #181818;
+  --font-color: #d1d1d1;
+  --search-item-background-color: #2f2f2f;
+  --search-item-background-color-hover: #3f3f3f;
+  --border-color: #fff3;
+  --article-item-background-color-hover: #2a2a2a;
+  --settings-btn-hover: #192d46;
+  --input-background-color: #343434;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+body {
+  min-width: 1440px;
+  margin: 0 auto;
+  color: var(--color-text);
+  background: var(--color-background);
+  transition: color 0.5s, background-color 0.5s;
+  line-height: 1.6;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-size: 15px;
+  color: var(--font-color);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  margin: 0 auto;
+  font-weight: normal;
+  background: var(--bx-background-color);
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+a {
+  text-decoration: none;
+  color: var(--theme-color);
+}
+.bx {
+  width: 1440px;
+  margin: 0 auto;
+}
+.icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+
+/* 显示时按钮样式 */
+.el-button--primary {
+  /* 需要更改的按钮类型 type='primary' */
+  background: var(--theme-color) !important;
+  border-color: var(--theme-color) !important;
+}
+/* 移入时按钮样式 type='primary' */
+.el-button--primary:hover {
+  background: #0e5bc0 !important;
+  border-color: #0e5bc0 !important;
+  color: #fff !important;
+  opacity: 0.8;
+}
+.el-button--default {
+  /* 需要更改的按钮类型 type='default' */
+  background: #f4f9ff !important;
+  border-color: #1d7efc !important;
+  color: #007fff !important;
+}
+/* 移入时按钮样式type='default' */
+.el-button--default:hover {
+  background: #fff !important;
+  border-color: #45a3fc !important;
+  color: #3599f5 !important;
+  opacity: 0.8;
+}
+
+.el-skeleton {
+  background-color: var(--background-color);
+  padding: 20px 40px;
+}
+
+.el-tag {
+  margin-left: 8px;
+}
+
+.el-badge__content--primary {
+  background-color: var(--theme-color) !important;
+}
+
+input[disabled] {
+  background-color: #f0f0f0; /* 禁用状态的背景颜色 */
+  cursor: not-allowed; /* 不可选择的鼠标指针 */
+}
