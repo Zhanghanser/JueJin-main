@@ -1,106 +1,177 @@
 const db = require('../db')
-let total = 0
 
-exports.getComprehensive = (req, res) => {
-  let { page, limit, sort, keyWords } = req.query
-  keyWords && (keyWords = keyWords.replace(/'/g, ''))
+exports.getComprehensive = async (req, res) => {
+  try {
+    let { page, limit, sort, keyWords } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+    let total = 0
 
-  let sql = `select article.id,user.nickname,user.username,title,content,cover,name AS 'article_type',view_num,like_num,article.create_time,user.id AS user_id from article
+    let baseSql = `select article.id,user.nickname,user.username,title,content,cover,name AS 'article_type',view_num,like_num,article.create_time,user.id AS user_id from article
   inner join article_type on article.type_id=article_type.id
-  inner join user on article.user_id=user.id\n
+  inner join user on article.user_id=user.id
   where status=1 `
-  keyWords &&
-    (sql += `and title like '%${keyWords}%' or content like '%${keyWords}%'\n`)
+    let countParams = []
+    let queryParams = []
 
-  db.query(sql, (_err, results) => (total = results.length))
+    if (keyWords) {
+      const likePattern = `%${keyWords}%`
+      baseSql += `and (title like ? or content like ?) `
+      countParams.push(likePattern, likePattern)
+      queryParams.push(likePattern, likePattern)
+    }
 
-  switch (sort) {
-    case '0':
-      sql += 'ORDER BY view_num DESC,like_num DESC'
-      break
-    case '1':
-      sql += 'ORDER BY article.create_time DESC'
-      break
-    case '2':
-      sql += 'ORDER BY like_num DESC,view_num DESC'
-      break
-  }
-  sql += `\nlimit ${(page - 1) * limit},${limit};`
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    // Get total count
+    try {
+      const [countResult] = await db.promise().query(baseSql, countParams)
+      total = countResult.length
+    } catch (_e) {
+      // ignore count error
+    }
+
+    switch (sort) {
+      case '0':
+        baseSql += 'ORDER BY view_num DESC,like_num DESC'
+        break
+      case '1':
+        baseSql += 'ORDER BY article.create_time DESC'
+        break
+      case '2':
+        baseSql += 'ORDER BY like_num DESC,view_num DESC'
+        break
+    }
+    baseSql += `\nlimit ? offset ?`
+    queryParams.push(limit, (page - 1) * limit)
+
+    const [results] = await db.promise().query(baseSql, queryParams)
     res.send({
       status: 0,
       message: '获取文章成功！',
       data: results,
       total
     })
-  })
-}
-exports.getArticleList = (req, res) => {
-  let { page, limit, sort, keyWords } = req.query
-  keyWords && (keyWords = keyWords.replace(/'/g, ''))
-
-  let sql = `select article.id,user.nickname,user.username,title,content,cover,name AS 'article_type',view_num,like_num,article.create_time,user.id AS user_id from article
-  inner join article_type on article.type_id=article_type.id
-  inner join user on article.user_id=user.id\n
-  where status=1 `
-
-  keyWords &&
-    (sql += `and title like '%${keyWords}%' or content like '%${keyWords}%'\n`)
-
-  db.query(sql, (_err, results) => (total = results.length))
-
-  switch (sort) {
-    case '0':
-      sql += 'ORDER BY view_num DESC,like_num DESC'
-      break
-    case '1':
-      sql += 'ORDER BY article.create_time DESC'
-      break
-    case '2':
-      sql += 'ORDER BY like_num DESC,view_num DESC'
-      break
+  } catch (err) {
+    return res.cc(err)
   }
-  sql += `\nlimit ${(page - 1) * limit},${limit}`
-  let randomSortSql = `SELECT * FROM (${sql}) AS sorted_data ORDER BY RAND();`
-  db.query(randomSortSql, (err, results) => {
-    if (err) return res.cc(err)
+}
+
+exports.getArticleList = async (req, res) => {
+  try {
+    let { page, limit, sort, keyWords } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+    let total = 0
+
+    let baseSql = `select article.id,user.nickname,user.username,title,content,cover,name AS 'article_type',view_num,like_num,article.create_time,user.id AS user_id from article
+  inner join article_type on article.type_id=article_type.id
+  inner join user on article.user_id=user.id
+  where status=1 `
+    let countParams = []
+    let queryParams = []
+
+    if (keyWords) {
+      const likePattern = `%${keyWords}%`
+      baseSql += `and (title like ? or content like ?) `
+      countParams.push(likePattern, likePattern)
+      queryParams.push(likePattern, likePattern)
+    }
+
+    // Get total count
+    try {
+      const [countResult] = await db.promise().query(baseSql, countParams)
+      total = countResult.length
+    } catch (_e) {
+      // ignore count error
+    }
+
+    switch (sort) {
+      case '0':
+        baseSql += 'ORDER BY view_num DESC,like_num DESC'
+        break
+      case '1':
+        baseSql += 'ORDER BY article.create_time DESC'
+        break
+      case '2':
+        baseSql += 'ORDER BY like_num DESC,view_num DESC'
+        break
+    }
+    baseSql += `\nlimit ? offset ?`
+    queryParams.push(limit, (page - 1) * limit)
+
+    let randomSortSql = `SELECT * FROM (${baseSql}) AS sorted_data ORDER BY RAND();`
+    const [results] = await db.promise().query(randomSortSql, queryParams)
     res.send({
       status: 0,
       message: '获取文章成功！',
       data: results,
       total
     })
-  })
-}
-exports.getUserList = (req, res) => {
-  let { page, limit, keyWords, userIdList } = req.query
-  keyWords && (keyWords = keyWords.replace(/'/g, ''))
-  let sql = `SELECT id,username,nickname,avatar FROM user WHERE `
-  if (keyWords) {
-    sql += `(nickname is null and username like '%${keyWords}%')or(nickname LIKE '%${keyWords}%')`
-  } else {
-    sql += `id in (${userIdList ? userIdList.join() : '-1'})`
+  } catch (err) {
+    return res.cc(err)
   }
+}
 
-  db.query(sql, (_err, results) => (total = results.length))
+exports.getUserList = async (req, res) => {
+  try {
+    let { page, limit, keyWords, userIdList } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+    let total = 0
 
-  sql += `ORDER BY create_time ASC\nlimit ${(page - 1) * limit},${limit};`
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    // If userIdList is a string, parse it; otherwise keep as array
+    if (typeof userIdList === 'string') {
+      try { userIdList = JSON.parse(userIdList) } catch (_e) { userIdList = userIdList.split(',') }
+    }
+
+    let sql = `SELECT id,username,nickname,avatar FROM user WHERE `
+    let params = []
+
+    if (keyWords) {
+      const likePattern = `%${keyWords}%`
+      sql += `(nickname is null and username like ?) or (nickname like ?)`
+      params.push(likePattern, likePattern)
+    } else {
+      if (userIdList && userIdList.length > 0) {
+        const placeholders = userIdList.map(() => '?').join(',')
+        sql += `id in (${placeholders})`
+        params.push(...userIdList)
+      } else {
+        sql += `id in (-1)`
+      }
+    }
+
+    // Get total count
+    try {
+      const [countResult] = await db.promise().query(sql, params)
+      total = countResult.length
+    } catch (_e) {
+      // ignore count error
+    }
+
+    sql += ` ORDER BY create_time ASC\nlimit ? offset ?`
+    params.push(limit, (page - 1) * limit)
+
+    const [results] = await db.promise().query(sql, params)
     res.send({
       status: 0,
       message: '获取用户列表成功！',
       data: results,
       total
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
 
-exports.getArticleByTagId = (req, res) => {
-  let { page, limit, sort, tagId } = req.query
+exports.getArticleByTagId = async (req, res) => {
+  try {
+    let { page, limit, sort, tagId } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+    let total = 0
+    let tagName = ''
 
-  let sql = `SELECT
+    let sql = `SELECT
     article.id,
     USER.nickname,
     USER.username,
@@ -117,27 +188,39 @@ exports.getArticleByTagId = (req, res) => {
     INNER JOIN article ON article_tag_merge.article_id = article.id 
     INNER JOIN article_type ON article.type_id = article_type.id
     INNER JOIN USER ON article.user_id = USER.id 
-  WHERE tag_id = '${tagId}' AND article.status=1 `
+  WHERE tag_id = ? AND article.status=1 `
 
-  db.query(sql, (_err, results) => (total = results.length))
-  let tagName = ''
-  let sql2 = `select tag_name from tag where id=${tagId}`
-  db.query(sql2, (_err, results) => (tagName = results.length == 1 ? results[0].tag_name : null))
+    // Get total count
+    try {
+      const [countResult] = await db.promise().query(sql, [tagId])
+      total = countResult.length
+    } catch (_e) {
+      // ignore count error
+    }
 
-  switch (sort) {
-    case '0':
-      sql += 'ORDER BY view_num DESC,like_num DESC'
-      break
-    case '1':
-      sql += 'ORDER BY article.create_time DESC'
-      break
-    case '2':
-      sql += 'ORDER BY like_num DESC,view_num DESC'
-      break
-  }
-  sql += `\nlimit ${(page - 1) * limit},${limit};`
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    // Get tag name
+    try {
+      let sql2 = `select tag_name from tag where id=?`
+      const [tagResult] = await db.promise().query(sql2, [tagId])
+      tagName = tagResult.length == 1 ? tagResult[0].tag_name : null
+    } catch (_e) {
+      // ignore
+    }
+
+    switch (sort) {
+      case '0':
+        sql += 'ORDER BY view_num DESC,like_num DESC'
+        break
+      case '1':
+        sql += 'ORDER BY article.create_time DESC'
+        break
+      case '2':
+        sql += 'ORDER BY like_num DESC,view_num DESC'
+        break
+    }
+    sql += `\nlimit ? offset ?`
+
+    const [results] = await db.promise().query(sql, [tagId, limit, (page - 1) * limit])
     res.send({
       status: 0,
       message: total == 0 ? '标签不存在' : '获取标签文章成功！',
@@ -145,31 +228,57 @@ exports.getArticleByTagId = (req, res) => {
       total,
       tagName
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
-exports.getArticleByUserIdList = (req, res) => {
-  let { page, limit, userIdList } = req.query
 
-  let sql = `select article.id,user.nickname,user.username,title,content,cover,view_num,like_num,article.create_time,user.id AS user_id from article
+exports.getArticleByUserIdList = async (req, res) => {
+  try {
+    let { page, limit, userIdList } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+
+    if (typeof userIdList === 'string') {
+      try { userIdList = JSON.parse(userIdList) } catch (_e) { userIdList = userIdList.split(',') }
+    }
+
+    let sql = `select article.id,user.nickname,user.username,title,content,cover,view_num,like_num,article.create_time,user.id AS user_id from article
   inner join user on article.user_id=user.id
-  where status=1 and user_id in (${userIdList ? userIdList.join() : '-1'}) ORDER BY article.create_time DESC\n`
+  where status=1 `
+    let params = []
 
-  page && (sql += `limit ${(page - 1) * limit},${limit}`)
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    if (userIdList && userIdList.length > 0) {
+      const placeholders = userIdList.map(() => '?').join(',')
+      sql += `and user_id in (${placeholders}) `
+      params.push(...userIdList)
+    } else {
+      sql += `and user_id in (-1) `
+    }
+
+    sql += `ORDER BY article.create_time DESC\nlimit ? offset ?`
+    params.push(limit, (page - 1) * limit)
+
+    const [results] = await db.promise().query(sql, params)
     if (results.length === 0) return res.cc('没有更多了！', 0)
     res.send({
       status: 0,
       message: '获取文章成功！',
       data: results
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
-exports.getArticleByUserId = (req, res) => {
-  // type: 0为草稿，1为已发布的文章
-  let { page, limit, userId, type } = req.query
 
-  let sql = `
+exports.getArticleByUserId = async (req, res) => {
+  // type: 0为草稿，1为已发布的文章
+  try {
+    let { page, limit, userId, type } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+
+    let sql = `
   SELECT
     article.id,
     USER.nickname,
@@ -187,23 +296,32 @@ exports.getArticleByUserId = (req, res) => {
     INNER JOIN article_type ON article.type_id = article_type.id
     INNER JOIN USER ON article.user_id = USER.id 
   WHERE
-    STATUS =${type} and user_id=${userId} `
+    STATUS =? and user_id=? `
+    let params = [type, userId]
 
-  page && (sql += `limit ${(page - 1) * limit},${limit}`)
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    sql += `limit ? offset ?`
+    params.push(limit, (page - 1) * limit)
+
+    const [results] = await db.promise().query(sql, params)
     if (results.length === 0) return res.cc('没有更多了！', 0)
     res.send({
       status: 0,
       message: `获取${type == 0 ? '草稿' : '文章'}成功！`,
       data: results
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
-exports.getStarredArticleByUserId = (req, res) => {
-  let { page, limit, userId } = req.query
 
-  let sql = `SELECT
+exports.getStarredArticleByUserId = async (req, res) => {
+  try {
+    let { page, limit, userId } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+    let total = 0
+
+    let sql = `SELECT
       article.id,
       USER.nickname,
       USER.username,
@@ -220,12 +338,19 @@ exports.getStarredArticleByUserId = (req, res) => {
       INNER JOIN article_type ON article.type_id = article_type.id
       INNER JOIN USER ON article.user_id = USER.id 
     WHERE
-      STATUS =1 and article.id in(select article_id from star WHERE user_id=${userId}) `
-  db.query(sql, (_err, results) => (total = results.length))
+      STATUS =1 and article.id in(select article_id from star WHERE user_id=?) `
 
-  page && (sql += `limit ${(page - 1) * limit},${limit}`)
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    // Get total count
+    try {
+      const [countResult] = await db.promise().query(sql, [userId])
+      total = countResult.length
+    } catch (_e) {
+      // ignore count error
+    }
+
+    sql += `limit ? offset ?`
+
+    const [results] = await db.promise().query(sql, [userId, limit, (page - 1) * limit])
     if (results.length === 0) return res.cc('没有更多了！', 0)
     res.send({
       status: 0,
@@ -233,12 +358,18 @@ exports.getStarredArticleByUserId = (req, res) => {
       data: results,
       total
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
-exports.getLikedArticleByUserId = (req, res) => {
-  let { page, limit, userId } = req.query
 
-  let sql = `SELECT
+exports.getLikedArticleByUserId = async (req, res) => {
+  try {
+    let { page, limit, userId } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+
+    let sql = `SELECT
       article.id,
       USER.nickname,
       USER.username,
@@ -255,24 +386,29 @@ exports.getLikedArticleByUserId = (req, res) => {
       INNER JOIN article_type ON article.type_id = article_type.id
       INNER JOIN USER ON article.user_id = USER.id 
     WHERE
-      STATUS =1 and article.id in(select content_id from \`like\`  WHERE type_id=0 and user_id=${userId}) `
+      STATUS =1 and article.id in(select content_id from \`like\`  WHERE type_id=0 and user_id=?) `
 
-  page && (sql += `limit ${(page - 1) * limit},${limit}`)
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    sql += `limit ? offset ?`
+
+    const [results] = await db.promise().query(sql, [userId, limit, (page - 1) * limit])
     if (results.length === 0) return res.cc('没有更多了！', 0)
     res.send({
       status: 0,
       message: '获取点赞文章成功！',
       data: results
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
-exports.getArticleByKeyWordsFromPublishedAndStarredAndLiked = (req, res) => {
-  let { page, limit, userId, keyWords } = req.query
-  keyWords && (keyWords = keyWords.replace(/'/g, ''))
 
-  let sql = `SELECT
+exports.getArticleByKeyWordsFromPublishedAndStarredAndLiked = async (req, res) => {
+  try {
+    let { page, limit, userId, keyWords } = req.query
+    page = Number(page) || 1
+    limit = Number(limit) || 10
+
+    let sql = `SELECT
             article.id,
             USER.nickname,
             USER.username,
@@ -290,19 +426,27 @@ exports.getArticleByKeyWordsFromPublishedAndStarredAndLiked = (req, res) => {
             INNER JOIN USER ON article.user_id = USER.id 
           WHERE
             STATUS = 1 
-            AND (user_id = ${userId}
-                OR article.id IN (SELECT content_id FROM \`like\` WHERE type_id = 0 AND user_id = ${userId}) 
-                OR article.id IN (SELECT article_id  FROM \`star\` WHERE user_id = ${userId})) `
-  keyWords &&
-    (sql += `AND (title like '%${keyWords}%' or content like '%${keyWords}%')`)
+            AND (user_id = ?
+                OR article.id IN (SELECT content_id FROM \`like\` WHERE type_id = 0 AND user_id = ?) 
+                OR article.id IN (SELECT article_id  FROM \`star\` WHERE user_id = ?)) `
+    let params = [userId, userId, userId]
 
-  sql += `\nlimit ${(page - 1) * limit},${limit};`
-  db.query(sql, (err, results) => {
-    if (err) return res.cc(err)
+    if (keyWords) {
+      const likePattern = `%${keyWords}%`
+      sql += `AND (title like ? or content like ?)`
+      params.push(likePattern, likePattern)
+    }
+
+    sql += `\nlimit ? offset ?`
+    params.push(limit, (page - 1) * limit)
+
+    const [results] = await db.promise().query(sql, params)
     res.send({
       status: 0,
       message: '获取文章成功！',
       data: results
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }

@@ -4,11 +4,11 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
 let axios = require('axios')
 
-exports.login = (req, res) => {
-  const userInfo = req.body
-  const sql = 'select * from user where username=?'
-  db.query(sql, userInfo.username, (err, results) => {
-    if (err) return res.cc(err)
+exports.login = async (req, res) => {
+  try {
+    const userInfo = req.body
+    const sql = 'select * from user where username=?'
+    const [results] = await db.promise().query(sql, [userInfo.username])
     if (results.length !== 1) {
       return res.cc('用户不存在')
     }
@@ -24,27 +24,29 @@ exports.login = (req, res) => {
           expiresIn: config.expiresIn
         })
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
 
-exports.register = (req, res) => {
-  const userInfo = req.body
-  const sql = 'select * from user where username=?'
-  db.query(sql, userInfo.username, (err, results) => {
-    if (err) return res.cc(err)
+exports.register = async (req, res) => {
+  try {
+    const userInfo = req.body
+    const sql = 'select * from user where username=?'
+    const [results] = await db.promise().query(sql, [userInfo.username])
     if (results.length > 0) {
       return res.cc('用户名已被占用')
     }
-    const sql = 'insert into user set ?'
+    const sql2 = 'insert into user set ?'
     userInfo.password = bcrypt.hashSync(userInfo.password, 10)
-    db.query(sql, userInfo, (err, results) => {
-      if (err) return res.cc(err)
-      if (results.affectedRows !== 1) {
-        return res.cc('注册失败,请联系管理员')
-      }
-      res.cc('注册成功！', 0)
-    })
-  })
+    const [insertResult] = await db.promise().query(sql2, userInfo)
+    if (insertResult.affectedRows !== 1) {
+      return res.cc('注册失败,请联系管理员')
+    }
+    res.cc('注册成功！', 0)
+  } catch (err) {
+    return res.cc(err)
+  }
 }
 
 exports.githubOAuth = async (req, res) => {
@@ -55,9 +57,9 @@ exports.githubOAuth = async (req, res) => {
       return
     }
     const body = {
-      client_id: process.env.GITHUB_CLIENT_ID,
-      client_secret: process.env.GITHUB_CLIENT_SECRET,
-      code: code
+      client_id: '3c8ad4de2df49076331b', // 必须
+      client_secret: '704ee0107f03e3d3d0a7c9ad263356d6946c16f2', // 必须
+      code: code // 必须,这个不用我们填写，当授权跳转后，会在/oauth-callback 自动添加code
     }
     const opts = { headers: { accept: 'application/json' } }
     const response = await axios.post(
@@ -85,21 +87,17 @@ exports.githubOAuth = async (req, res) => {
     if (user.id) {
       //验证用户是否已经在数据库中
       const sql = 'select * from user where id=?'
-      db.query(sql, user.id, (err, results) => {
-        if (err) return res.cc(err)
-        if (results.length !== 1) {
-          const sql2 = 'insert into user set ?'
-          db.query(sql2, user, (err) => {
-            if (err) return res.cc(err)
-          })
-        }
-        let token =
-          'Bearer ' +
-          jwt.sign({ username }, config.jwtSecretKey, {
-            expiresIn: config.expiresIn
-          })
-        res.redirect(`http://localhost:5172/?token=${token}`)
-      })
+      const [existing] = await db.promise().query(sql, [user.id])
+      if (existing.length !== 1) {
+        const sql2 = 'insert into user set ?'
+        await db.promise().query(sql2, user)
+      }
+      let tokenStr =
+        'Bearer ' +
+        jwt.sign({ username }, config.jwtSecretKey, {
+          expiresIn: config.expiresIn
+        })
+      res.redirect(`http://localhost:5172/?token=${tokenStr}`)
     } else {
       res.cc('授权登录失败')
     }
@@ -108,16 +106,18 @@ exports.githubOAuth = async (req, res) => {
   }
 }
 
-exports.getUserInfo = (req, res) => {
-  const { id } = req.query
-  const sql = 'select * from user where id=?'
-  db.query(sql, id, (err, results) => {
-    if (err) return res.cc(err)
+exports.getUserInfo = async (req, res) => {
+  try {
+    const { id } = req.query
+    const sql = 'select * from user where id=?'
+    const [results] = await db.promise().query(sql, [id])
     if (results.length === 0) return res.cc('用户不存在！', 0)
     res.send({
       status: 0,
       message: '获取用户信息成功！',
       data: results[0]
     })
-  })
+  } catch (err) {
+    return res.cc(err)
+  }
 }
