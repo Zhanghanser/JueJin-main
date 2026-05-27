@@ -55,9 +55,9 @@ exports.githubOAuth = async (req, res) => {
       return
     }
     const body = {
-      client_id: '3c8ad4de2df49076331b', // 必须
-      client_secret: '704ee0107f03e3d3d0a7c9ad263356d6946c16f2', // 必须
-      code: code // 必须,这个不用我们填写，当授权跳转后，会在/oauth-callback 自动添加code
+      client_id: process.env.GITHUB_CLIENT_ID,
+      client_secret: process.env.GITHUB_CLIENT_SECRET,
+      code: code
     }
     const opts = { headers: { accept: 'application/json' } }
     const response = await axios.post(
