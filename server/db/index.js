@@ -1,4 +1,4 @@
-const mysql = require('mysql')
+const mysql = require('mysql2')
 
 const db = mysql.createPool({
   host: 'localhost',
@@ -6,7 +6,10 @@ const db = mysql.createPool({
   password: '123456',
   database: 'juejin',
   charset: 'utf8mb4',
-  port: '3306'
+  port: '3306',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 })
 
 module.exports = db
